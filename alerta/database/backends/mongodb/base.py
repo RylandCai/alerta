@@ -46,10 +46,8 @@ class Backend(Database):
         db.keys.create_index([('key', ASCENDING)], unique=True)
         db.perms.create_index([('match', ASCENDING)], unique=True)
         db.users.drop_indexes()
-        db.users.create_index([('login', ASCENDING)], unique=True,
-                              partialFilterExpression={'login': {'$type': 'string'}})
-        db.users.create_index([('email', ASCENDING)], unique=True,
-                              partialFilterExpression={'email': {'$type': 'string'}})
+        db.users.create_index([('login', ASCENDING)], unique=True, partialFilterExpression={'login': {'$type': 'string'}})
+        db.users.create_index([('email', ASCENDING)], unique=True, partialFilterExpression={'email': {'$type': 'string'}})
         db.groups.create_index([('name', ASCENDING)], unique=True)
         db.metrics.create_index([('group', ASCENDING), ('name', ASCENDING)], unique=True)
 
@@ -98,6 +96,7 @@ class Backend(Database):
         Get severity of correlated alert. Used to determine previous severity.
         """
         query = {
+            'project': alert.project,
             'environment': alert.environment,
             'resource': alert.resource,
             '$or': [
@@ -119,6 +118,7 @@ class Backend(Database):
         Get status of correlated or duplicate alert. Used to determine previous status.
         """
         query = {
+            'project': alert.project,
             'environment': alert.environment,
             'resource': alert.resource,
             '$or': [
@@ -136,6 +136,7 @@ class Backend(Database):
 
     def is_duplicate(self, alert):
         query = {
+            'project': alert.project,
             'environment': alert.environment,
             'resource': alert.resource,
             'event': alert.event,
@@ -146,6 +147,7 @@ class Backend(Database):
 
     def is_correlated(self, alert):
         query = {
+            'project': alert.project,
             'environment': alert.environment,
             'resource': alert.resource,
             '$or': [
@@ -167,6 +169,7 @@ class Backend(Database):
         """
         pipeline = [
             {'$match': {
+                'project': alert.project,
                 'environment': alert.environment,
                 'resource': alert.resource,
                 'event': alert.event,
@@ -191,6 +194,7 @@ class Backend(Database):
         repeat=True, and keep track of last receive id and time but don't append to history unless status changes.
         """
         query = {
+            'project': alert.project,
             'environment': alert.environment,
             'resource': alert.resource,
             'event': alert.event,
@@ -243,6 +247,7 @@ class Backend(Database):
         receive id and time, appending all to history. Append to history again if status changes.
         """
         query = {
+            'project': alert.project,
             'environment': alert.environment,
             'resource': alert.resource,
             '$or': [
@@ -304,6 +309,7 @@ class Backend(Database):
             '_id': alert.id,
             'resource': alert.resource,
             'event': alert.event,
+            'project': alert.project,
             'environment': alert.environment,
             'severity': alert.severity,
             'correlate': alert.correlate,
@@ -524,6 +530,7 @@ class Backend(Database):
 
     def get_alert_history(self, alert, page=None, page_size=None):
         query = {
+            'project': alert.project,
             'environment': alert.environment,
             'resource': alert.resource,
             '$or': [
@@ -539,6 +546,7 @@ class Backend(Database):
         fields = {
             'resource': 1,
             'event': 1,
+            'project': 1,
             'environment': 1,
             'customer': 1,
             'service': 1,
@@ -568,6 +576,7 @@ class Backend(Database):
                     'id': response['history']['id'],
                     'resource': response['resource'],
                     'event': response['history'].get('event'),
+                    'project': response['project'],
                     'environment': response['environment'],
                     'severity': response['history'].get('severity'),
                     'service': response['service'],
@@ -592,6 +601,7 @@ class Backend(Database):
         fields = {
             'resource': 1,
             'event': 1,
+            'project': 1,
             'environment': 1,
             'customer': 1,
             'service': 1,
@@ -623,6 +633,7 @@ class Backend(Database):
                     'id': response['history']['id'],
                     'resource': response['resource'],
                     'event': response['history']['event'],
+                    'project': response['project'],
                     'environment': response['environment'],
                     'severity': response['history']['severity'],
                     'service': response['service'],
@@ -685,6 +696,7 @@ class Backend(Database):
                     '_id': '$%s' % group,
                     'count': {'$sum': 1},
                     'duplicateCount': {'$sum': '$duplicateCount'},
+                    'project': {'$addToSet': 'project'},
                     'environments': {'$addToSet': '$environment'},
                     'services': {'$addToSet': '$service'},
                     'resources': {'$addToSet': {'id': '$_id', 'resource': '$resource'}}
@@ -701,6 +713,7 @@ class Backend(Database):
             top.append(
                 {
                     '%s' % group: response['_id'],
+                    'project': response['project'],
                     'environments': response['environments'],
                     'services': response['services'],
                     'resources': response['resources'],
@@ -722,6 +735,7 @@ class Backend(Database):
                     '_id': '$%s' % group,
                     'count': {'$sum': 1},
                     'duplicateCount': {'$max': '$duplicateCount'},
+                    'project': {'$addToSet': 'project'},
                     'environments': {'$addToSet': '$environment'},
                     'services': {'$addToSet': '$service'},
                     'resources': {'$addToSet': {'id': '$_id', 'resource': '$resource'}}
@@ -738,6 +752,7 @@ class Backend(Database):
             top.append(
                 {
                     '%s' % group: response['_id'],
+                    'project': response['project'],
                     'environments': response['environments'],
                     'services': response['services'],
                     'resources': response['resources'],
@@ -758,6 +773,7 @@ class Backend(Database):
                     'count': {'$sum': 1},
                     'duplicateCount': {'$sum': '$duplicateCount'},
                     'lifeTime': {'$sum': {'$subtract': ['$lastReceiveTime', '$createTime']}},
+                    'project': {'$addToSet': 'project'},
                     'environments': {'$addToSet': '$environment'},
                     'services': {'$addToSet': '$service'},
                     'resources': {'$addToSet': {'id': '$_id', 'resource': '$resource'}}
@@ -773,6 +789,7 @@ class Backend(Database):
             top.append(
                 {
                     '%s' % group: response['_id'],
+                    'project': response['project'],
                     'environments': response['environments'],
                     'services': response['services'],
                     'resources': response['resources'],
@@ -781,6 +798,43 @@ class Backend(Database):
                 }
             )
         return top
+
+    # PROJECTS
+
+    def get_projects(self, query=None, topn=1000):
+        query = query or Query()
+
+        def pipeline(group_by):
+            return [
+                {'$match': query.where},
+                {'$project': {'project': 1, group_by: 1}},
+                {'$group':
+                    {
+                        '_id': {'project': '$project', group_by: '$' + group_by},
+                        'count': {'$sum': 1}
+                    }
+                },
+                {'$limit': topn}
+            ]
+
+        response_severity = self.get_db().alerts.aggregate(pipeline('severity'))
+        severity_count = defaultdict(list)
+        for r in response_severity:
+            severity_count[r['_id']['project']].append((r['_id']['severity'], r['count']))
+
+        response_status = self.get_db().alerts.aggregate(pipeline('status'))
+        status_count = defaultdict(list)
+        for r in response_status:
+            status_count[r['_id']['project']].append((r['_id']['status'], r['count']))
+
+        projects = self.get_db().alerts.find().distinct('project')
+        return [
+            {
+                'project': proj,
+                'severityCounts': dict(severity_count[proj]),
+                'statusCounts': dict(status_count[proj]),
+                'count': sum(t[1] for t in severity_count[proj])
+            } for proj in projects]
 
     # ENVIRONMENTS
 
@@ -829,12 +883,7 @@ class Backend(Database):
                 {'$unwind': '$service'},
                 {'$match': query.where},
                 {'$project': {'environment': 1, 'service': 1, group_by: 1}},
-                {'$group':
-                 {
-                     '_id': {'environment': '$environment', 'service': '$service', group_by: '$' + group_by},
-                     'count': {'$sum': 1}
-                 }
-                 },
+                {'$group': {'_id': {'environment': '$environment', 'service': '$service', group_by: '$' + group_by}, 'count': {'$sum': 1}}},
                 {'$limit': topn}
             ]
 

@@ -464,6 +464,31 @@ def get_top10_standing():
         )
 
 
+# get alert projects
+@api.route('/projects', methods=['OPTIONS', 'GET'])
+@cross_origin()
+@permission(Scope.read_alerts)
+@timer(gets_timer)
+@jsonp
+def get_projects():
+    query = qb.from_params(request.args, customers=g.customers)
+    projects = Alert.get_projects(query)
+
+    if projects:
+        return jsonify(
+            status='ok',
+            projects=projects,
+            total=len(projects)
+        )
+    else:
+        return jsonify(
+            status='ok',
+            message='not found',
+            projects=[],
+            total=0
+        )
+
+
 # get alert environments
 @api.route('/environments', methods=['OPTIONS', 'GET'])
 @cross_origin()

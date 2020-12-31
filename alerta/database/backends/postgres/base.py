@@ -1,5 +1,7 @@
 import threading
 import time
+import logging
+
 from collections import defaultdict, namedtuple
 from datetime import datetime
 
@@ -17,6 +19,7 @@ from alerta.utils.response import absolute_url
 
 from .utils import Query
 
+LOG = logging.getLogger('alerta.database')
 MAX_RETRIES = 5
 
 
@@ -53,8 +56,8 @@ class HistoryAdapter:
 
 
 Record = namedtuple('Record', [
-    'id', 'resource', 'event', 'environment', 'severity', 'status', 'service',
-    'group', 'value', 'text', 'tags', 'attributes', 'origin', 'update_time',
+    'id', 'resource', 'event', 'environment', 'project', 'severity', 'status',
+    'service', 'group', 'value', 'text', 'tags', 'attributes', 'origin', 'update_time',
     'user', 'timeout', 'type', 'customer'
 ])
 
@@ -94,7 +97,8 @@ class Backend(Database):
                 conn.set_client_encoding('UTF8')
                 break
             except Exception as e:
-                print(e)  # FIXME - should log this error instead of printing, but current_app is unavailable here
+                # print(e)  # FIXME - should log this error instead of printing, but current_app is unavailable here
+                LOG.error(e)
                 retry += 1
                 if retry > MAX_RETRIES:
                     conn = None
@@ -147,7 +151,7 @@ class Backend(Database):
     def get_severity(self, alert):
         select = """
             SELECT severity FROM alerts
-             WHERE environment=%(environment)s AND resource=%(resource)s
+             WHERE project=%(project)s AND environment=%(environment)s AND resource=%(resource)s
                AND ((event=%(event)s AND severity!=%(severity)s)
                 OR (event!=%(event)s AND %(event)s=ANY(correlate)))
                AND {customer}
@@ -157,16 +161,16 @@ class Backend(Database):
     def get_status(self, alert):
         select = """
             SELECT status FROM alerts
-             WHERE environment=%(environment)s AND resource=%(resource)s
-              AND (event=%(event)s OR %(event)s=ANY(correlate))
-              AND {customer}
+             WHERE project=%(project)s AND environment=%(environment)s AND resource=%(resource)s
+               AND (event=%(event)s OR %(event)s=ANY(correlate))
+               AND {customer}
             """.format(customer='customer=%(customer)s' if alert.customer else 'customer IS NULL')
         return self._fetchone(select, vars(alert)).status
 
     def is_duplicate(self, alert):
         select = """
             SELECT * FROM alerts
-             WHERE environment=%(environment)s
+             WHERE project=%(project)s AND environment=%(environment)s
                AND resource=%(resource)s
                AND event=%(event)s
                AND severity=%(severity)s
@@ -177,7 +181,7 @@ class Backend(Database):
     def is_correlated(self, alert):
         select = """
             SELECT * FROM alerts
-             WHERE environment=%(environment)s AND resource=%(resource)s
+             WHERE project=%(project)s AND environment=%(environment)s AND resource=%(resource)s
                AND ((event=%(event)s AND severity!=%(severity)s)
                 OR (event!=%(event)s AND %(event)s=ANY(correlate)))
                AND {customer}
@@ -191,7 +195,7 @@ class Backend(Database):
         select = """
             SELECT COUNT(*)
               FROM alerts, unnest(history) h
-             WHERE environment=%(environment)s
+             WHERE project=%(project)s AND environment=%(environment)s
                AND resource=%(resource)s
                AND h.event=%(event)s
                AND h.update_time > (NOW() at time zone 'utc' - INTERVAL '{window} seconds')
@@ -213,7 +217,7 @@ class Backend(Database):
                    last_receive_id=%(last_receive_id)s, last_receive_time=%(last_receive_time)s,
                    tags=ARRAY(SELECT DISTINCT UNNEST(tags || %(tags)s)), attributes=attributes || %(attributes)s,
                    duplicate_count=duplicate_count + 1, {update_time}, history=(%(history)s || history)[1:{limit}]
-             WHERE environment=%(environment)s
+             WHERE project=%(project)s AND environment=%(environment)s
                AND resource=%(resource)s
                AND event=%(event)s
                AND severity=%(severity)s
@@ -236,7 +240,7 @@ class Backend(Database):
                    trend_indication=%(trend_indication)s, receive_time=%(receive_time)s, last_receive_id=%(last_receive_id)s,
                    last_receive_time=%(last_receive_time)s, tags=ARRAY(SELECT DISTINCT UNNEST(tags || %(tags)s)),
                    attributes=attributes || %(attributes)s, {update_time}, history=(%(history)s || history)[1:{limit}]
-             WHERE environment=%(environment)s
+             WHERE project=%(project)s AND environment=%(environment)s
                AND resource=%(resource)s
                AND ((event=%(event)s AND severity!=%(severity)s) OR (event!=%(event)s AND %(event)s=ANY(correlate)))
                AND {customer}
@@ -250,12 +254,12 @@ class Backend(Database):
 
     def create_alert(self, alert):
         insert = """
-            INSERT INTO alerts (id, resource, event, environment, severity, correlate, status, service, "group",
-                value, text, tags, attributes, origin, type, create_time, timeout, raw_data, customer,
+            INSERT INTO alerts (id, resource, event, project, environment, severity, correlate, status, service,
+                "group", value, text, tags, attributes, origin, type, create_time, timeout, raw_data, customer,
                 duplicate_count, repeat, previous_severity, trend_indication, receive_time, last_receive_id,
                 last_receive_time, update_time, history)
-            VALUES (%(id)s, %(resource)s, %(event)s, %(environment)s, %(severity)s, %(correlate)s, %(status)s,
-                %(service)s, %(group)s, %(value)s, %(text)s, %(tags)s, %(attributes)s, %(origin)s,
+            VALUES (%(id)s, %(resource)s, %(event)s, %(project)s, %(environment)s, %(severity)s, %(correlate)s,
+                %(status)s, %(service)s, %(group)s, %(value)s, %(text)s, %(tags)s, %(attributes)s, %(origin)s,
                 %(event_type)s, %(create_time)s, %(timeout)s, %(raw_data)s, %(customer)s, %(duplicate_count)s,
                 %(repeat)s, %(previous_severity)s, %(trend_indication)s, %(receive_time)s, %(last_receive_id)s,
                 %(last_receive_time)s, %(update_time)s, %(history)s::history[])
@@ -400,10 +404,10 @@ class Backend(Database):
             select = '*'
         else:
             select = (
-                'id, resource, event, environment, severity, correlate, status, service, "group", value, "text",'
-                + 'tags, attributes, origin, type, create_time, timeout, {raw_data}, customer, duplicate_count, repeat,'
-                + 'previous_severity, trend_indication, receive_time, last_receive_id, last_receive_time, update_time,'
-                + '{history}'
+                'id, resource, event, project, environment, severity, correlate, status, service, "group", value,'
+                + '"text", tags, attributes, origin, type, create_time, timeout, {raw_data}, customer, duplicate_count,'
+                + 'repeat, previous_severity, trend_indication, receive_time, last_receive_id, last_receive_time,'
+                + 'update_time, {history}'
             ).format(
                 raw_data='raw_data' if raw_data else 'NULL as raw_data',
                 history='history' if history else 'array[]::history[] as history'
@@ -428,9 +432,9 @@ class Backend(Database):
 
     def get_alert_history(self, alert, page=None, page_size=None):
         select = """
-            SELECT resource, environment, service, "group", tags, attributes, origin, customer, h.*
+            SELECT resource, project, environment, service, "group", tags, attributes, origin, customer, h.*
               FROM alerts, unnest(history[1:{limit}]) h
-             WHERE environment=%(environment)s AND resource=%(resource)s
+             WHERE project=%(project)s AND environment=%(environment)s AND resource=%(resource)s
                AND (h.event=%(event)s OR %(event)s=ANY(correlate))
                AND {customer}
           ORDER BY update_time DESC
@@ -443,6 +447,7 @@ class Backend(Database):
                 id=h.id,
                 resource=h.resource,
                 event=h.event,
+                project=h.project,
                 environment=h.environment,
                 severity=h.severity,
                 status=h.status,
@@ -472,7 +477,7 @@ class Backend(Database):
             query.vars['id'] = self._fetchone(select, query.vars)
 
         select = """
-            SELECT resource, environment, service, "group", tags, attributes, origin, customer, history, h.*
+            SELECT resource, project, environment, service, "group", tags, attributes, origin, customer, history, h.*
               FROM alerts, unnest(history[1:{limit}]) h
              WHERE {where}
           ORDER BY update_time DESC
@@ -483,6 +488,7 @@ class Backend(Database):
                 id=h.id,
                 resource=h.resource,
                 event=h.event,
+                project=h.project,
                 environment=h.environment,
                 severity=h.severity,
                 status=h.status,
@@ -544,8 +550,8 @@ class Backend(Database):
         query = query or Query()
         select = """
             SELECT event, COUNT(1) as count, SUM(duplicate_count) AS duplicate_count,
-                   array_agg(DISTINCT environment) AS environments, array_agg(DISTINCT svc) AS services,
-                   array_agg(DISTINCT ARRAY[id, resource]) AS resources
+                   array_agg(DISTINCT project) AS projects, array_agg(DISTINCT environment) AS environments,
+                   array_agg(DISTINCT svc) AS services, array_agg(DISTINCT ARRAY[id, resource]) AS resources
               FROM alerts, UNNEST (service) svc
              WHERE {where}
           GROUP BY {group}
@@ -555,6 +561,7 @@ class Backend(Database):
             {
                 'count': t.count,
                 'duplicateCount': t.duplicate_count,
+                'projects': t.projects,
                 'environments': t.environments,
                 'services': t.services,
                 '%s' % group: t.event,
@@ -567,8 +574,8 @@ class Backend(Database):
         select = """
             WITH topn AS (SELECT * FROM alerts WHERE {where})
             SELECT topn.event, COUNT(1) as count, SUM(duplicate_count) AS duplicate_count,
-                   array_agg(DISTINCT environment) AS environments, array_agg(DISTINCT svc) AS services,
-                   array_agg(DISTINCT ARRAY[topn.id, resource]) AS resources
+                   array_agg(DISTINCT project) AS projects, array_agg(DISTINCT environment) AS environments,
+                   array_agg(DISTINCT svc) AS services, array_agg(DISTINCT ARRAY[topn.id, resource]) AS resources
               FROM topn, UNNEST (service) svc, UNNEST (history) hist
              WHERE hist.type='severity'
           GROUP BY topn.{group}
@@ -578,6 +585,7 @@ class Backend(Database):
             {
                 'count': t.count,
                 'duplicateCount': t.duplicate_count,
+                'projects': t.projects,
                 'environments': t.environments,
                 'services': t.services,
                 'event': t.event,
@@ -591,8 +599,8 @@ class Backend(Database):
             WITH topn AS (SELECT * FROM alerts WHERE {where})
             SELECT topn.event, COUNT(1) as count, SUM(duplicate_count) AS duplicate_count,
                    SUM(last_receive_time - create_time) as life_time,
-                   array_agg(DISTINCT environment) AS environments, array_agg(DISTINCT svc) AS services,
-                   array_agg(DISTINCT ARRAY[topn.id, resource]) AS resources
+                   array_agg(DISTINCT project) AS projects, array_agg(DISTINCT environment) AS environments,
+                   array_agg(DISTINCT svc) AS services, array_agg(DISTINCT ARRAY[topn.id, resource]) AS resources
               FROM topn, UNNEST (service) svc, UNNEST (history) hist
              WHERE hist.type='severity'
           GROUP BY topn.{group}
@@ -602,12 +610,47 @@ class Backend(Database):
             {
                 'count': t.count,
                 'duplicateCount': t.duplicate_count,
+                'projects': t.projects,
                 'environments': t.environments,
                 'services': t.services,
                 'event': t.event,
                 'resources': [{'id': r[0], 'resource': r[1], 'href': absolute_url('/alert/%s' % r[0])} for r in t.resources]
             } for t in self._fetchall(select, query.vars, limit=topn)
         ]
+
+    # PROJECTS
+
+    def get_projects(self, query=None, topn=1000):
+        query = query or Query()
+        select = """
+               SELECT project, environment, severity, status, count(1) FROM alerts
+               WHERE {where}
+               GROUP BY project, environment, CUBE(severity, status)
+           """.format(where=query.where)
+        result = self._fetchall(select, query.vars, limit=topn)
+
+        severity_count = defaultdict(list)
+        status_count = defaultdict(list)
+        total_count = defaultdict(int)
+
+        for row in result:
+            if row.severity and not row.status:
+                severity_count[(row.project, row.environment)].append((row.severity, row.count))
+            if not row.severity and row.status:
+                status_count[(row.project, row.environment)].append((row.status, row.count))
+            if not row.severity and not row.status:
+                total_count[(row.project, row.environment)] = row.count
+
+        select = """SELECT DISTINCT project, environment FROM alerts"""
+        projects = self._fetchall(select, {})
+        return [
+            {
+                'project': p.project,
+                'environment': p.environment,
+                'severityCounts': dict(severity_count[(p.project, p.environment)]),
+                'statusCounts': dict(status_count[(p.project, p.environment)]),
+                'count': total_count[(p.project, p.environment)]
+            } for p in projects]
 
     # ENVIRONMENTS
 

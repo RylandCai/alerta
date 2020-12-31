@@ -189,6 +189,11 @@ class Database(Base):
     def get_topn_standing(self, query, group='event', topn=100):
         raise NotImplementedError
 
+    # PROJECTS
+
+    def get_projects(self, query=None, topn=1000):
+        raise NotImplementedError
+
     # ENVIRONMENTS
 
     def get_environments(self, query=None, topn=1000):

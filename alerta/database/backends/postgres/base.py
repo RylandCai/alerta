@@ -56,7 +56,7 @@ class HistoryAdapter:
 
 
 Record = namedtuple('Record', [
-    'id', 'resource', 'event', 'environment', 'project', 'severity', 'status',
+    'id', 'resource', 'event', 'project', 'environment', 'severity', 'status',
     'service', 'group', 'value', 'text', 'tags', 'attributes', 'origin', 'update_time',
     'user', 'timeout', 'type', 'customer'
 ])

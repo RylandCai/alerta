@@ -230,18 +230,6 @@ COLUMNS = [
 SORT_LIST_BY = ['severity', 'lastReceiveTime']  # eg. newest='lastReceiveTime' or oldest='-createTime' (Note: minus means reverse)
 DEFAULT_FILTER = {'status': ['open', 'ack']}
 
-# Alert Status Indicators
-# ASI_SEVERITY = [
-#     'critical', 'major', 'minor', 'warning', 'indeterminate', 'informational'
-# ]
-ASI_SEVERITY = ['critical', 'major', 'minor', 'warning', 'info']
-ASI_QUERIES = [
-    {'text': 'Production', 'query': [['environment', 'Production']]},
-    {'text': 'Development', 'query': [['environment', 'Development']]},
-    {'text': 'Heartbeats', 'query': {'q': 'event:Heartbeat'}},
-    {'text': 'Misc.', 'query': 'group=Misc'},
-]
-
 # Alarm list default font settings
 DEFAULT_FONT = {
     'font-family': '"Sintony", Arial, sans-serif',
@@ -262,6 +250,19 @@ PLUGINS_RAISE_ON_ERROR = True  # raise RuntimeError exception on first failure
 ORIGIN_BLACKLIST = []  # type: List[str]
 # ORIGIN_BLACKLIST = ['foo/bar$', '.*/qux']  # reject all foo alerts from bar, and everything from qux
 ALLOWED_ENVIRONMENTS = ['Production', 'Development']  # reject alerts without allowed environments
+
+# Alert Status Indicators
+ASI_SEVERITY = ['critical', 'major', 'minor', 'warning', 'info']
+ASI_QUERIES = [
+    {'text': 'Production', 'query': [['environment', 'Production']]},
+    {'text': 'Development', 'query': [['environment', 'Development']]},
+    {'text': 'Heartbeats', 'query': {'q': 'event:Heartbeat'}},
+    {'text': 'Misc.', 'query': 'group=Misc'},
+]
+# ASI_QUERIES = [
+#     {'text': 'HSC', 'query': [['environment', 'HSC']]},
+#     {'text': 'HSDP', 'query': [['environment', 'HSDP']]},
+# ]
 
 # blackout settings
 BLACKOUT_DURATION = 3600  # default period = 1 hour

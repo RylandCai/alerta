@@ -13,7 +13,12 @@ RUN apk add --no-cache \
     git
 
 COPY . /app
+RUN chmod 777 /app
 WORKDIR /app
+
+RUN mkdir -p /var/log/supervisor
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker-entrypoint.sh /
 
 RUN pip install -r requirements.txt
 RUN pip install python-ldap pysaml2
@@ -24,16 +29,14 @@ RUN pip install git+https://github.com/alerta/alerta-contrib.git#subdirectory=in
 
 ENV ALERTA_SVR_CONF_FILE /app/alertad.conf
 ENV ALERTA_CONF_FILE /app/alerta.conf
-ENV ALERTA_ENDPOINT=http://localhost:5000
+ENV ALERTA_ENDPOINT=http://localhost:8080
 
-RUN mkdir -p /var/log/supervisor
-
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY docker-entrypoint.sh /
+USER daemon
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
-EXPOSE 5000
+EXPOSE 8080
+
 ENV FLASK_SKIP_DOTENV=1
 
-# CMD ["alertad", "run", "--host", "0.0.0.0", "--port", "5000"]
-CMD ["/usr/bin/supervisord"]
+CMD ["alertad", "run", "--host", "0.0.0.0", "--port", "8080"]
+# CMD ["/usr/bin/supervisord"]

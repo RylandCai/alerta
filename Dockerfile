@@ -9,7 +9,7 @@ RUN apk add --no-cache \
     postgresql-dev \
     python3-dev \
     xmlsec-dev \
-    # supervisor \
+    supervisor \
     git
 
 COPY . /app
@@ -26,10 +26,14 @@ ENV ALERTA_SVR_CONF_FILE /app/alertad.conf
 ENV ALERTA_CONF_FILE /app/alerta.conf
 ENV ALERTA_ENDPOINT=http://localhost:5000
 
+RUN mkdir -p /var/log/supervisor
+
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
 EXPOSE 5000
 ENV FLASK_SKIP_DOTENV=1
-CMD ["alertad", "run", "--host", "0.0.0.0", "--port", "5000"]
-# CMD ["supervisord", "-c", "/etc/supervisord.conf"]
+
+# CMD ["alertad", "run", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["/usr/bin/supervisord"]

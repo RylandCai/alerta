@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     id text PRIMARY KEY,
     resource text NOT NULL,
     event text NOT NULL,
+    project text,
     environment text,
     severity text,
     correlate text[],

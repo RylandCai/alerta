@@ -161,19 +161,36 @@ AUDIT_URL = None  # send audit log events via webhook URL
 # CORS settings
 CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin', 'X-Request-ID']
 CORS_ORIGINS = [
-    # 'http://try.alerta.io',
-    # 'http://explorer.alerta.io',
-    'http://localhost',
-    'http://localhost:8000',
+    r'http://localhost:?\d*/?.*',
     r'https?://\w*\.?local\.alerta\.io:?\d*/?.*'  # => http(s)://*.local.alerta.io:<port>
 ]
 CORS_SUPPORTS_CREDENTIALS = AUTH_REQUIRED
 
 # Serverity settings
-SEVERITY_MAP = {}  # type: Dict[str, Any]
-DEFAULT_NORMAL_SEVERITY = None
-DEFAULT_PREVIOUS_SEVERITY = None
-COLOR_MAP = {}  # type: Dict[str, Any]
+# SEVERITY_MAP = {}  # type: Dict[str, Any]
+# COLOR_MAP = {}  # type: Dict[str, Any]
+# DEFAULT_NORMAL_SEVERITY = None
+# DEFAULT_PREVIOUS_SEVERITY = None
+SEVERITY_MAP = {
+    'critical': 1,
+    'major': 2,
+    'minor': 3,
+    'warning': 4,
+    'info': 5
+}
+COLOR_MAP = {
+    'severity': {
+        'critical': 'red',
+        'major': 'orange',
+        'minor': 'yellow',
+        'warning': 'dodgerblue',
+        'info': '#00CC00',
+        'unknown': 'silver'
+    },
+    'text': 'black'
+}
+DEFAULT_NORMAL_SEVERITY = 'info'
+DEFAULT_PREVIOUS_SEVERITY = 'warning'
 
 # Timeout settings
 DEFAULT_TIMEOUT = 86400  # seconds
@@ -213,17 +230,6 @@ COLUMNS = [
 SORT_LIST_BY = ['severity', 'lastReceiveTime']  # eg. newest='lastReceiveTime' or oldest='-createTime' (Note: minus means reverse)
 DEFAULT_FILTER = {'status': ['open', 'ack']}
 
-# Alert Status Indicators
-ASI_SEVERITY = [
-    'critical', 'major', 'minor', 'warning', 'indeterminate', 'informational'
-]
-ASI_QUERIES = [
-    {'text': 'Production', 'query': [['environment', 'Production']]},
-    {'text': 'Development', 'query': [['environment', 'Development']]},
-    {'text': 'Heartbeats', 'query': {'q': 'event:Heartbeat'}},
-    {'text': 'Misc.', 'query': 'group=Misc'},
-]
-
 # Alarm list default font settings
 DEFAULT_FONT = {
     'font-family': '"Sintony", Arial, sans-serif',
@@ -245,6 +251,19 @@ ORIGIN_BLACKLIST = []  # type: List[str]
 # ORIGIN_BLACKLIST = ['foo/bar$', '.*/qux']  # reject all foo alerts from bar, and everything from qux
 ALLOWED_ENVIRONMENTS = ['Production', 'Development']  # reject alerts without allowed environments
 
+# Alert Status Indicators
+ASI_SEVERITY = ['critical', 'major', 'minor', 'warning', 'info']
+ASI_QUERIES = [
+    {'text': 'Production', 'query': [['environment', 'Production']]},
+    {'text': 'Development', 'query': [['environment', 'Development']]},
+    {'text': 'Heartbeats', 'query': {'q': 'event:Heartbeat'}},
+    {'text': 'Misc.', 'query': 'group=Misc'},
+]
+# ASI_QUERIES = [
+#     {'text': 'HSC', 'query': [['environment', 'HSC']]},
+#     {'text': 'HSDP', 'query': [['environment', 'HSDP']]},
+# ]
+
 # blackout settings
 BLACKOUT_DURATION = 3600  # default period = 1 hour
 NOTIFICATION_BLACKOUT = False  # True - set alert status=blackout, False - do not process alert (default)
@@ -261,3 +280,10 @@ FWD_DESTINATIONS = [
 ]  # type: List[Tuple]
 
 # valid actions=['*', 'alerts', 'actions', 'open', 'assign', 'ack', 'unack', 'shelve', 'unshelve', 'close', 'delete']
+
+# resource field mapping
+# for hsdp,
+# resource from application, use 'application';
+# resource from services(rds, redis, s3), use 'hsdp_instance_name'.
+HSDP_FIELD_MAPPING = ['application', 'hsdp_instance_name']
+PROM_FIELD_MAPPING = ['container', 'service', 'pod']

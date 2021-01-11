@@ -49,6 +49,7 @@ class Alert:
         self.id = kwargs.get('id') or str(uuid4())
         self.resource = resource
         self.event = event
+        self.project = kwargs.get('project', None) or ''
         self.environment = kwargs.get('environment', None) or ''
         self.severity = kwargs.get('severity', None) or alarm_model.DEFAULT_NORMAL_SEVERITY
         self.correlate = kwargs.get('correlate', None) or list()
@@ -97,6 +98,7 @@ class Alert:
             id=json.get('id', None),
             resource=json.get('resource', None),
             event=json.get('event', None),
+            project=json.get('project', None),
             environment=json.get('environment', None),
             severity=json.get('severity', None),
             correlate=json.get('correlate', list()),
@@ -122,6 +124,7 @@ class Alert:
             'href': absolute_url('/alert/' + self.id),
             'resource': self.resource,
             'event': self.event,
+            'project': self.project,
             'environment': self.environment,
             'severity': self.severity,
             'correlate': self.correlate,
@@ -162,8 +165,8 @@ class Alert:
         return body
 
     def __repr__(self) -> str:
-        return 'Alert(id={!r}, environment={!r}, resource={!r}, event={!r}, severity={!r}, status={!r}, customer={!r})'.format(
-            self.id, self.environment, self.resource, self.event, self.severity, self.status, self.customer
+        return 'Alert(id={!r}, project={!r}, environment={!r}, resource={!r}, event={!r}, severity={!r}, status={!r}, customer={!r})'.format(
+            self.id, self.project, self.environment, self.resource, self.event, self.severity, self.status, self.customer
         )
 
     @classmethod
@@ -172,6 +175,7 @@ class Alert:
             id=doc.get('id', None) or doc.get('_id'),
             resource=doc.get('resource', None),
             event=doc.get('event', None),
+            project=doc.get('project', None),
             environment=doc.get('environment', None),
             severity=doc.get('severity', None),
             correlate=doc.get('correlate', list()),
@@ -205,6 +209,7 @@ class Alert:
             id=rec.id,
             resource=rec.resource,
             event=rec.event,
+            project=rec.project,
             environment=rec.environment,
             severity=rec.severity,
             correlate=rec.correlate,
@@ -518,6 +523,11 @@ class Alert:
     @staticmethod
     def get_top10_standing(query: Query = None) -> List[Dict[str, Any]]:
         return db.get_topn_standing(query, topn=10)
+
+    # get projects
+    @staticmethod
+    def get_projects(query: Query = None) -> List[str]:
+        return db.get_projects(query)
 
     # get environments
     @staticmethod

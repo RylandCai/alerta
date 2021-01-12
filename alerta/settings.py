@@ -184,7 +184,7 @@ COLOR_MAP = {
         'major': 'orange',
         'minor': 'yellow',
         'warning': 'dodgerblue',
-        'info': '#00CC00',
+        'info': 'green',
         'unknown': 'silver'
     },
     'text': 'black'
